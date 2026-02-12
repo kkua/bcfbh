@@ -18,7 +18,7 @@ pub fn test_create_booklet(src_pdf: &PdfDocumentHolder) {
     doc.set_creator("BCFBH");
     // let img = oxidize_pdf::Image::from_jpeg_file("r-0.jpg").unwrap();
     let idx = 0;
-    let (width, height, page_rgba) = src_pdf.get_page_image(idx);
+    let (width, height, page_rgba) = src_pdf.get_page_image(idx, false);
 
     let img = oxidize_pdf::Image::from_rgba_data(page_rgba, width, height).unwrap();
     // 3mm
@@ -101,7 +101,12 @@ pub fn create_booklet(
 /// * `src_pdf` - 源PDF文档容器
 /// * `doc` - 目标PDF文档对象
 fn write_pdf_metadata(src_pdf: &PdfDocumentHolder<'_>, doc: &mut Document) {
-    let creator = format!("{} v{} - {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"), env!("CARGO_PKG_DESCRIPTION"));
+    let creator = format!(
+        "{} v{} - {}",
+        env!("CARGO_PKG_NAME"),
+        env!("CARGO_PKG_VERSION"),
+        env!("CARGO_PKG_DESCRIPTION")
+    );
     doc.set_creator(creator);
     // doc.set_producer(pkg_name);
 
@@ -135,18 +140,27 @@ fn create_page(
     binding_rule: &BindingRule,
 ) -> Option<Page> {
     let page_low_idx = page_idx;
-    let page_high_idx = page_end_idx - page_idx + page_start_idx;
+    let mut page_high_idx = page_end_idx - page_idx + page_start_idx;
+    let binding_at_middle = binding_rule.binding_at_middle;
     if page_low_idx >= page_high_idx {
         // 本册结束了
         return None;
     }
+    if !binding_at_middle {
+        page_high_idx = (page_end_idx - page_start_idx) / 2 + page_idx;
+    }
+
     let page_count = src_pdf.get_page_count();
 
+    let is_sheet_back = page_idx % 2 != 0;
     let img_low = if page_low_idx >= page_count {
         // 空白的情况，没有低页
         None
     } else {
-        let (page_low_width, page_low_height, page_low_rgba) = src_pdf.get_page_image(page_low_idx);
+        // 获取低页的图像数据
+        let reverse_image = is_sheet_back;
+        let (page_low_width, page_low_height, page_low_rgba) =
+            src_pdf.get_page_image(page_low_idx, reverse_image);
         Some(
             oxidize_pdf::Image::from_rgba_data(page_low_rgba, page_low_width, page_low_height)
                 .unwrap(),
@@ -156,9 +170,10 @@ fn create_page(
         // 空白的情况，没有高页
         None
     } else {
-        // 获取高页
+        // 获取高页的图像数据
+        let reverse_image = !(is_sheet_back ^ binding_at_middle);
         let (page_high_width, page_high_height, page_high_rgba) =
-            src_pdf.get_page_image(page_high_idx);
+            src_pdf.get_page_image(page_high_idx, reverse_image);
         let img_high =
             oxidize_pdf::Image::from_rgba_data(page_high_rgba, page_high_width, page_high_height)
                 .unwrap();

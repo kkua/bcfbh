@@ -49,14 +49,13 @@ impl<'a> PdfDocumentHolder<'a> {
     ///
     /// # 返回
     /// 返回 (width, height, rgba_bytes) 元组
-    pub fn get_page_image(&self, page_idx: u16) -> (u32, u32, Vec<u8>) {
-        // 装订位置
-        let rotate = if true {
-            // 旋转90°为中缝装订
-            PdfPageRenderRotation::Degrees90
-        } else {
-            // 旋转270°为两边装订
+    pub fn get_page_image(&self, page_idx: u16, reverse_image: bool) -> (u32, u32, Vec<u8>) {
+        let rotate = if reverse_image {
+            //旋转270°
             PdfPageRenderRotation::Degrees270
+        } else {
+            // 旋转90°
+            PdfPageRenderRotation::Degrees90
         };
         let page = self.pages().get(page_idx).unwrap();
         let render_config = PdfRenderConfig::new()
