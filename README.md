@@ -69,18 +69,23 @@ cargo build --release
 编辑 `src/main.rs` 中的配置参数：
 
 ```rust
-let booklet_config = booklet::BindingRule{
-    input_path: PathBuf::from("input.pdf"),      // 输入PDF文件路径
-    output_dir: PathBuf::from("out"),              // 输出目录
-    sheets_per_booklet: 10,                        // 每个小册子的A4纸张数量（默认10张，即40页）
-};
-booklet::split_pdf(&booklet_config);
+    let pdfium = pdf_render::init_pdfium();
+    let filename = "input.pdf";
+    let input_path = PathBuf::from(filename);
+    let booklet_config = booklet::BindingRule{
+        input_path: PathBuf::from("input.pdf"),      // 输入PDF文件路径
+        output_dir: PathBuf::from("out"),              // 输出目录
+        sheets_per_booklet: 10,                        // 每个小册子的A4纸张数量（默认10张，即40页）
+    };
+    let src_pdf = pdf_render::PdfDocumentHolder::new(&pdfium, &input_path, None);
+    dbg!(src_pdf.get_page_count());
+    booklet::create_booklet(&src_pdf, &binding_rule);
 ```
 
 然后运行：
 
 ```bash
-cargo run
+cargo run --release
 ```
 
 ## 配置参数

@@ -89,7 +89,7 @@ pub fn create_booklet(
     .unwrap();
 
     println!(
-        "完成第{}册子，共{}页",
+        "完成第{}册，共{}页",
         booklet_idx,
         booklet_end_page - booklet_start_page
     );
