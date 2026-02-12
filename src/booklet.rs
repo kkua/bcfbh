@@ -5,7 +5,7 @@ use oxidize_pdf::{
     operations::{self, SplitMode, SplitOptions},
 };
 
-use crate::pdf_edit;
+use crate::{pdf_creator, pdf_edit, pdf_render::PdfDocumentHolder};
 
 pub struct BindingRule {
     /// 输入PDF文件路径
@@ -14,6 +14,9 @@ pub struct BindingRule {
     pub output_dir: PathBuf,
     /// 每个小册子的A4纸数量（默认10张，即40页）
     pub sheets_per_booklet: usize,
+
+    /// 装订方式（默认在中间装订）
+    pub binding_at_middle: bool,
     // /// 是否在首页前添加空白页作为封面
     // pub add_blank_cover: bool,
     // /// 是否添加页码
@@ -24,17 +27,39 @@ pub struct BindingRule {
     // pub page_number_position: PageNumberPosition,
 }
 
-struct BookletConfig {
-    booklet_sheets: u32,
+impl Default for BindingRule {
+    fn default() -> Self {
+        Self {
+            input_path: PathBuf::new(),
+            output_dir: PathBuf::new(),
+            sheets_per_booklet: 10,
+            binding_at_middle: true,
+        }
+    }
+}
+
+impl BindingRule {
+    pub fn new(input_path: &PathBuf) -> Self {
+        Self {
+            input_path: input_path.clone(),
+            output_dir: input_path.parent().unwrap().join("out"),
+            ..Default::default()
+        }
+    }
+}
+
+pub struct BookletConfig {
+    pub booklet_sheets: u32,
     // 加1张纸的册子数量
-    add_sheet_booklet_count: u32,
+    pub add_sheet_booklet_count: u32,
 }
 
 /// 计算每册的纸张数量
 fn calc_booklet_pages(page_count: u32, sheets_per_booklet: u32) -> BookletConfig {
-    let last_add = page_count % 4;
+    // let last_add = page_count % 4;
     // 对齐到4的倍数
-    let total = page_count + last_add;
+    let total = ((page_count + 3) / 4) * 4;
+    let last_add = total - page_count;
     // 每册对应的页数
     let pages_per_booklet = sheets_per_booklet * 4;
     // 获取册数
@@ -43,28 +68,27 @@ fn calc_booklet_pages(page_count: u32, sheets_per_booklet: u32) -> BookletConfig
     let last_booklet_pages = total % pages_per_booklet;
     let mut booklet_sheets = sheets_per_booklet;
     // 重新分配每册页数
-    if (last_booklet_pages / 4 <= booklet_count) {
+    if last_booklet_pages / 4 <= booklet_count {
         // 最后一册全部分给前几册，每册多分1张纸
         let res = BookletConfig {
             booklet_sheets,
             add_sheet_booklet_count: last_booklet_pages / 4,
         };
-        booklet_sheets += 1;
-
+        // booklet_sheets += 1;
         return res;
-    } else if (last_booklet_pages * 2 < pages_per_booklet) {
+    } else if last_booklet_pages * 2 < pages_per_booklet {
         // 小册子均分一下
         booklet_count += 1;
         // booklet_sheets 一定会小于 paper_count_per_booklet
         booklet_sheets = total / booklet_count;
         // remain_booklet_sheets 一定会小于 booklet_sheets
-        let remain_booklet_sheets = (total - booklet_sheets * 4 * booklet_count) / 4;
+        let remain_booklet_sheets = (booklet_sheets * 4 * booklet_count - total) / 4;
         let booklet_config = BookletConfig {
             booklet_sheets,
             add_sheet_booklet_count: remain_booklet_sheets,
         };
 
-        booklet_sheets += 1;
+        // booklet_sheets += 1;
         return booklet_config;
     } else {
         BookletConfig {
@@ -139,3 +163,39 @@ pub fn split_pdf(config: &BindingRule) {
 //         // page_num += booklet_pages;
 //     }
 // }
+
+pub fn create_booklet(
+    src_pdf: &PdfDocumentHolder,
+    binding_rule: &BindingRule,
+    // booklet_config: &BookletConfig,
+) {
+    let page_count = src_pdf.get_page_count();
+    let booklet_config =
+        calc_booklet_pages(page_count as u32, binding_rule.sheets_per_booklet as u32);
+    let mut booklet_idx = 0u16;
+    let mut page_idx = 0u16;
+
+    let pages_per_booklet = (booklet_config.booklet_sheets * 4) as u16;
+    while page_idx < page_count {
+        let booklet_start_page = page_idx;
+        let mut booklet_end_page = booklet_start_page + pages_per_booklet;
+        if (booklet_idx as u32) < booklet_config.add_sheet_booklet_count {
+            booklet_end_page += 4;
+        }
+        if booklet_end_page > page_count {
+            booklet_end_page = page_count;
+        }
+        booklet_idx += 1;
+        // if let Some(page) = create_page(src_pdf, booklet_idx as u16, booklet_start_page as u16, booklet_end_page as u16, binding_rule) {
+        //     doc.add_page(page);
+        // }
+        pdf_creator::create_booklet(
+            src_pdf,
+            binding_rule,
+            booklet_idx,
+            booklet_start_page,
+            booklet_end_page,
+        );
+        page_idx = booklet_end_page;
+    }
+}

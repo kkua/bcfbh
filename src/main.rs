@@ -5,20 +5,20 @@ use oxidize_pdf::{
     operations::{self, PageRange, SplitMode, SplitOptions},
 };
 
+use crate::booklet::BindingRule;
+
 mod booklet;
+mod pdf_creator;
 mod pdf_edit;
+mod pdf_render;
 
 fn main() {
-    let reader = PdfReader::open("2.pdf").unwrap();
-    // // let booklet_pages = booklet::calc_booklet_pages(pdf_doc.page_count().unwrap(), 4);
-    let pdf_doc = PdfDocument::new(reader);
-    // booklet::split_pdf(40, &pdf_doc);
 
-    pdf_edit::split_pages(&pdf_doc, 40);
-    let booklet_config = booklet::BindingRule {
-        input_path: PathBuf::from("XTJGS.pdf"),
-        output_dir: PathBuf::from("out"),
-        sheets_per_booklet: 10,
-    };
-    booklet::split_pdf(&booklet_config);
+    let filename = "input.pdf";
+    let input_path = PathBuf::from(filename);
+    let binding_rule = booklet::BindingRule::new(&input_path);
+    let src_pdf = pdf_render::PdfDocumentHolder::new(&pdfium, &input_path, None);
+    dbg!(src_pdf.get_page_count());
+    booklet::create_booklet(&src_pdf, &binding_rule);
+    // pdf_creator::create_booklet(&src_doc);
 }

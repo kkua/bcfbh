@@ -8,20 +8,55 @@
 - 自动计算每册的最佳页数分配
 - 支持智能页数对齐（自动对齐到4的倍数）
 - 保留原始PDF的页面内容
+- 按小册子模式重新排版成PDF文件，适配中间装订、两边装订。由于打印机支持小册子且可选择装订位置，故可能不会实现该功能
+- 添加中缝装订线
 
 ## 暂未实现的功能
 - 自动页码
-- 按小册子模式重新排版成PDF文件，适配中间装订、两边装订。由于打印机支持小册子且可选择装订位置，故可能不会实现该功能
-- 添加中缝装订线
 - 调用打印机打印，自动设置打印参数
 
 ## 安装
 
-确保已安装Rust环境，然后克隆并构建项目：
+### 1. 安装Rust环境
+
+确保已安装Rust环境，然后克隆项目：
 
 ```bash
 git clone https://codeberg.org/Kaay/bcfbh
 cd bcfbh
+```
+
+### 2. 准备Pdfium动态链接库
+
+本项目使用 [pdfium-render](https://crates.io/crates/pdfium-render) 库进行PDF渲染，需要Pdfium动态链接库支持。
+
+#### 下载Pdfium库
+
+从 [bblanchon/pdfium-binaries](https://github.com/bblanchon/pdfium-binaries) 下载对应平台的预编译库：
+
+- **Windows**: 下载 `pdfium-windows-x64.tgz` 或 `pdfium-windows-x86.tgz`
+- **Linux**: 下载 `pdfium-linux-x64.tgz` 或 `pdfium-linux-arm64.tgz`
+- **macOS**: 下载 `pdfium-mac-x64.tgz` 或 `pdfium-mac-arm64.tgz`
+
+#### 放置库文件
+
+在项目根目录创建 `ffi` 文件夹，将下载的Pdfium库文件放入其中：
+
+```
+bdfb/
+├── ffi/
+│   ├── pdfium.dll          # Windows
+│   ├── libpdfium.so        # Linux
+│   └── libpdfium.dylib     # macOS
+├── src/
+└── ...
+```
+
+> **注意**: 程序运行时会从 `./ffi/` 目录加载Pdfium动态链接库。
+
+### 3. 构建项目
+
+```bash
 cargo build --release
 ```
 
@@ -46,11 +81,14 @@ cargo run
 
 ## 配置参数
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `input_path` | `PathBuf` | 输入PDF文件的完整路径 |
-| `output_dir` | `PathBuf` | 输出目录路径 |
-| `sheets_per_booklet` | `usize` | 每个小册子包含的A4纸张数量，每张纸可打印4页（双面打印，每面2页） |
+### BindingRule 结构体
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `input_path` | `PathBuf` | - | 输入PDF文件的完整路径 |
+| `output_dir` | `PathBuf` | 源文件所在目录下的`out`文件夹 | 输出目录路径 |
+| `sheets_per_booklet` | `usize` | 10 | 每个小册子包含的A4纸张数量，每张纸可打印4页（双面打印，每面2页） |
+| `binding_at_middle` | `bool` | `true` | 装订方式，`true`为中间装订，`false`为两边装订 |
 
 ## 输出文件
 
@@ -66,7 +104,11 @@ cargo run
 
 ## 依赖
 
-- [oxidize-pdf](https://crates.io/crates/oxidize-pdf) (1.6.13) - PDF处理库
+| 依赖库 | 版本 | 说明 |
+|--------|------|------|
+| [oxidize-pdf](https://crates.io/crates/oxidize-pdf) | 1.6.13 | PDF创建和编辑库 |
+| [pdfium-render](https://crates.io/crates/pdfium-render) | 0.8.37 | PDF渲染库，用于将页面渲染为图像提取 |
+| [image](https://crates.io/crates/image) | 0.25 | 图像处理库 |
 
 ## 项目结构
 
@@ -75,8 +117,10 @@ bdfb/
 ├── Cargo.toml          # 项目配置
 ├── src/
 │   ├── main.rs         # 程序入口
-│   ├── booklet.rs      # 小册子拆分逻辑
-│   └── pdf_edit.rs     # PDF编辑工具函数
+│   ├── booklet.rs      # 小册子拆分逻辑和配置结构体
+│   ├── pdf_edit.rs     # PDF编辑工具函数
+│   ├── pdf_creator.rs  # PDF小册子页面创建
+│   └── pdf_render.rs   # PDF渲染和页面图像提取
 └── README.md           # 本文件
 ```
 
