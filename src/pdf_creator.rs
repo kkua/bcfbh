@@ -3,6 +3,7 @@ use crate::booklet::BookletConfig;
 use crate::pdf_render::PdfDocumentHolder;
 use oxidize_pdf::Color;
 use oxidize_pdf::Document;
+use oxidize_pdf::Font;
 use oxidize_pdf::Page;
 use oxidize_pdf::graphics::LineDashPattern;
 use pdfium_render::prelude::PdfDocumentMetadataTagType;
@@ -71,6 +72,7 @@ pub fn create_booklet(
             page_idx,
             booklet_start_page,
             booklet_end_page,
+            booklet_idx,
             binding_rule,
         ) {
             doc.add_page(page);
@@ -89,9 +91,11 @@ pub fn create_booklet(
     .unwrap();
 
     println!(
-        "完成第{}册，共{}页",
+        "完成第{}册，共{}页, 开始页: {}, 结束页: {}",
         booklet_idx,
-        booklet_end_page - booklet_start_page
+        booklet_end_page - booklet_start_page,
+        booklet_start_page,
+        booklet_end_page
     );
 }
 
@@ -137,6 +141,7 @@ fn create_page(
     page_idx: u16,
     page_start_idx: u16,
     page_end_idx: u16,
+    booklet_num: u16,
     binding_rule: &BindingRule,
 ) -> Option<Page> {
     let page_low_idx = page_idx;
@@ -217,13 +222,26 @@ fn create_page(
             .unwrap();
     }
 
+    let dot_space = margin * 5.0;
+    let ((start_x, start_y), (to_x, to_y)) = if is_sheet_back {
+        ((dot_space, h / 2.0), (w, h / 2.0))
+    } else {
+        ((w - dot_space, h / 2.0), (0.0, h / 2.0))
+    };
     page1
         .graphics()
         .set_stroke_color(Color::Gray(0.3))
-        .move_to(margin * 5.0, h / 2.0)
-        .line_to(w, h / 2.0)
-        .set_line_dash_pattern(LineDashPattern::dotted(1.0, margin * 5.0))
+        .move_to(start_x, start_y)
+        .line_to(to_x, to_y)
+        .set_line_dash_pattern(LineDashPattern::dotted(1.0, dot_space))
         .stroke();
+    if is_sheet_back {
+        let _ = page1
+            .text()
+            .set_font(Font::TimesRoman, 6.0)
+            .at(w / 2.0 + margin, h / 2.0)
+            .write(format!("^- {} -^", booklet_num).as_str());
+    }
 
     // 在页面垂直方向中间绘制虚线
     // 使用一系列短线段模拟虚线效果
