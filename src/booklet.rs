@@ -15,7 +15,7 @@ pub struct BindingRule {
     /// 每个小册子的A4纸数量（默认10张，即40页）
     pub sheets_per_booklet: usize,
 
-    /// 装订方式（默认在中间装订）
+    /// 装订方式（默认为true:在中间装订）
     pub binding_at_middle: bool,
     // /// 是否在首页前添加空白页作为封面
     // pub add_blank_cover: bool,
@@ -196,6 +196,6 @@ pub fn create_booklet(
             booklet_start_page,
             booklet_end_page,
         );
-        page_idx = booklet_end_page;
+        page_idx = booklet_end_page + 1;
     }
 }
