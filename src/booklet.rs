@@ -196,6 +196,6 @@ pub fn create_booklet(
             booklet_start_page,
             booklet_end_page,
         );
-        page_idx = booklet_end_page + 1;
+        page_idx = booklet_end_page;
     }
 }

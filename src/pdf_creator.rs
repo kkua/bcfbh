@@ -50,6 +50,14 @@ pub fn test_create_booklet(src_pdf: &PdfDocumentHolder) {
     doc.save("0211.pdf").unwrap();
 }
 
+/// 创建册子
+/// 
+ /// # 参数
+ /// * `src_pdf` - 源PDF文档容器
+ /// * `binding_rule` - 装订规则
+ /// * `booklet_idx` - 册子索引
+ /// * `booklet_start_page` - 小册子开始页索引(包含)
+ /// * `booklet_end_page` - 小册子结束页索引(不包含)
 pub fn create_booklet(
     src_pdf: &PdfDocumentHolder,
     binding_rule: &BindingRule,
@@ -145,7 +153,7 @@ fn create_page(
     binding_rule: &BindingRule,
 ) -> Option<Page> {
     let page_low_idx = page_idx;
-    let mut page_high_idx = page_end_idx - page_idx + page_start_idx;
+    let mut page_high_idx = page_end_idx - page_idx + page_start_idx -1;
     let binding_at_middle = binding_rule.binding_at_middle;
     if page_low_idx >= page_high_idx {
         // 本册结束了
@@ -235,7 +243,7 @@ fn create_page(
         .line_to(to_x, to_y)
         .set_line_dash_pattern(LineDashPattern::dotted(1.0, dot_space))
         .stroke();
-    if is_sheet_back {
+    if !is_sheet_back {
         let _ = page1
             .text()
             .set_font(Font::TimesRoman, 6.0)
