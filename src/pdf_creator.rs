@@ -150,12 +150,16 @@ fn create_page(
                 .unwrap();
         Some(img_high)
     };
+    let v_1mm_to_pt = 72.0 / 25.4;
     // 3mm
-    let margin = 3.0 * 72.0 / 25.4;
-    // Create a page
-    let mut page1 = Page::a4();
-    let (w, h) = (page1.width(), page1.height());
-    let margin_tb = margin * h / w / 2.0;
+    let margin = 3.0 * v_1mm_to_pt;
+    let mut new_page = Page::a4();
+    let (w, h) = (new_page.width(), new_page.height());
+    let half_h = h / 2.0;
+    let half_w = w / 2.0;
+    // 等比缩放
+    // let margin_tb = margin * h / w / 2.0; ==> margin * h/2.0 / w;
+    let margin_tb = margin * half_h / w;
 
     let (img_bottom, img_bottom_idx, img_top, img_top_idx) = if binding_rule.binding_at_middle {
         (img_low, page_low_idx, img_high, page_high_idx)
@@ -163,39 +167,41 @@ fn create_page(
         (img_high, page_high_idx, img_low, page_low_idx)
     };
 
+    let v_12mm = 12.0 * v_1mm_to_pt;
     if let Some(img) = img_bottom {
-        page1.add_image(format!("{}", img_bottom_idx), img);
-        page1
+        new_page.add_image(format!("{}", img_bottom_idx), img);
+        new_page
             .draw_image(
                 format!("{}", img_bottom_idx).as_str(),
                 margin,
                 margin_tb,
-                w - margin * 4.0,
-                h / 2.0 - margin_tb,
+                w - v_12mm,
+                half_h - margin_tb,
             )
             .unwrap();
     }
     if let Some(img) = img_top {
-        page1.add_image(format!("{}", img_top_idx), img);
-        page1
+        new_page.add_image(format!("{}", img_top_idx), img);
+        new_page
             .draw_image(
                 format!("{}", img_top_idx).as_str(),
                 margin,
-                h / 2.0 + margin_tb,
-                w - margin * 4.0,
-                h / 2.0 - margin_tb,
+                half_h + margin_tb,
+                w - v_12mm,
+                half_h - margin_tb,
             )
             .unwrap();
     }
 
     // 间隔1.2mm
-    let dot_space = margin * 4.0;
+    let dot_space = v_12mm;
+    let padding = 6.0 * v_1mm_to_pt;
     let ((start_x, start_y), (to_x, to_y)) = if is_sheet_back {
-        ((margin, h / 2.0), (w, h / 2.0))
+        ((padding, half_h), (w, half_h))
     } else {
-        ((w - margin, h / 2.0), (0.0, h / 2.0))
+        ((w - padding, half_h), (0.0, half_h))
     };
-    page1
+    new_page
         .graphics()
         .set_stroke_color(Color::Gray(0.3))
         .move_to(start_x, start_y)
@@ -203,11 +209,11 @@ fn create_page(
         .set_line_dash_pattern(LineDashPattern::dotted(1.0, dot_space))
         .stroke();
     if !is_sheet_back {
-        let _ = page1
+        let _ = new_page
             .text()
             .set_font(Font::TimesRoman, 6.0)
-            .at(w / 2.0 - margin * 1.8, h / 2.0)
+            .at(half_w - 9.0 * v_1mm_to_pt, half_h)
             .write(format!("^- {} -^", booklet_num).as_str());
     }
-    return Some(page1);
+    return Some(new_page);
 }

@@ -53,9 +53,12 @@ impl<'a> PdfDocumentHolder<'a> {
             PdfPageRenderRotation::Degrees90
         };
         let page = self.pages().get(page_idx).unwrap();
+        // 72 DPI: 595 x 842 像素
+        // 150 DPI: 1240 x 1754 像素
+        // 300 DPI: 2480 x 3508 像素
         let render_config = PdfRenderConfig::new()
-            .set_target_width(2000)
-            .set_maximum_height(2000)
+            .set_target_height(3508)
+            .set_maximum_height(3508)
             .rotate(rotate, true);
         let bitmap = page.render_with_config(&render_config).unwrap();
         let width = bitmap.width() as u32;
