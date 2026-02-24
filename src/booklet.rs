@@ -1,11 +1,5 @@
-use std::{fs::File, path::PathBuf};
-
-use oxidize_pdf::{
-    PdfDocument, PdfReader,
-    operations::{self, SplitMode, SplitOptions},
-};
-
-use crate::{pdf_creator, pdf_edit, pdf_render::PdfDocumentHolder};
+use std::{path::PathBuf};
+use crate::{pdf_creator, pdf_render::PdfDocumentHolder};
 
 pub struct BindingRule {
     /// 输入PDF文件路径
@@ -46,12 +40,21 @@ impl BindingRule {
             ..Default::default()
         }
     }
+
+    pub fn set_output_path(mut self, out_path: &Option<PathBuf>) -> Self {
+        if let Some(path) = out_path {
+            self.output_dir = path.clone();
+        }
+        self
+    }
 }
 
 pub struct BookletConfig {
     pub booklet_sheets: u32,
     // 加1张纸的册子数量
     pub add_sheet_booklet_count: u32,
+    /// 最后一册的填充页数
+    pub tail_pad_page: u32,
 }
 
 /// 计算每册的纸张数量
@@ -73,6 +76,7 @@ fn calc_booklet_pages(page_count: u32, sheets_per_booklet: u32) -> BookletConfig
         let res = BookletConfig {
             booklet_sheets,
             add_sheet_booklet_count: last_booklet_pages / 4,
+            tail_pad_page: last_add,
         };
         // booklet_sheets += 1;
         return res;
@@ -86,88 +90,21 @@ fn calc_booklet_pages(page_count: u32, sheets_per_booklet: u32) -> BookletConfig
         let booklet_config = BookletConfig {
             booklet_sheets,
             add_sheet_booklet_count: remain_booklet_sheets,
+            tail_pad_page: last_add,
         };
-
-        // booklet_sheets += 1;
         return booklet_config;
     } else {
         BookletConfig {
             booklet_sheets,
             add_sheet_booklet_count: 0,
+            tail_pad_page: last_add,
         }
     }
-    // return booklet_papers;
 }
-
-pub fn split_pdf(config: &BindingRule) {
-    let reader = PdfReader::open(&config.input_path).unwrap();
-    let pdf_doc = PdfDocument::new(reader);
-    let page_count = pdf_doc.page_count().unwrap() as u32;
-    let booklet_config = calc_booklet_pages(page_count, config.sheets_per_booklet as u32);
-    let mut booklet_idx = 0u32;
-    let mut page_idx = 0u32;
-
-    let pages_per_booklet = booklet_config.booklet_sheets * 4;
-    while page_idx < page_count {
-        let booklet_start_page = page_idx;
-        let mut booklet_end_page = booklet_start_page + pages_per_booklet;
-        if (booklet_idx < booklet_config.add_sheet_booklet_count) {
-            booklet_end_page += 4;
-        }
-        if booklet_end_page > page_count {
-            booklet_end_page = page_count;
-        }
-        booklet_idx += 1;
-        pdf_edit::retain_page_range(&pdf_doc, booklet_idx, booklet_start_page, booklet_end_page);
-        page_idx = booklet_end_page;
-    }
-
-    // pdf_edit::split_pages(&pdf_doc, booklet_config.booklet_sheets * 4);
-    // let booklet_config = calc_booklet_pages(config.input_path.metadata().unwrap().len() as u32, config.sheets_per_booklet);
-}
-
-// pub fn split_pdf(booklet_pages: u32, pdf_doc: &PdfDocument<File>) {
-//     // let doc = PdfDocument::new(reader);
-//     // let reader = PdfReader::open("path");;
-//     let page_count = pdf_doc.page_count().unwrap() as u32;
-//     let mut booklet_num = 0u32;
-//     let mut page_num = 0u32;
-//     let mut options = SplitOptions {
-//             mode: SplitMode::ChunkSize(booklet_pages),
-//             preserve_metadata: true,
-//             optimize: false,
-//             output_pattern: "booklet_{}.pdf".to_string(),
-//             ..Default::default()
-//         };
-//         // options.output_pattern = format!("booklet_{}.pdf", options);
-//         // options.mode = SplitMode::chunked(booklet_start, booklet_end);
-//         dbg!(operations::split::split_pdf("input.pdf", options).unwrap());
-//     while page_num < page_count {
-//         let booklet_start = booklet_num * booklet_pages;
-//         let mut booklet_end = booklet_start + booklet_pages;
-//         if booklet_end > page_count {
-//             booklet_end = page_count;
-//         }
-//         // let mut options = SplitOptions {
-//         //     mode: SplitMode::ChunkSize(booklet_pages),
-//         //     preserve_metadata: true,
-//         //     optimize: false,
-//         //     output_pattern: format!("booklet_"),
-//         //     ..Default::default()
-//         // };
-//         // // options.output_pattern = format!("booklet_{}.pdf", options);
-//         // // options.mode = SplitMode::chunked(booklet_start, booklet_end);
-//         // dbg!(operations::split::split_pdf("input.pdf", options));
-
-//         // booklet_num += 1;
-//         // page_num += booklet_pages;
-//     }
-// }
 
 pub fn create_booklet(
     src_pdf: &PdfDocumentHolder,
     binding_rule: &BindingRule,
-    // booklet_config: &BookletConfig,
 ) {
     let page_count = src_pdf.get_page_count();
     let booklet_config =
@@ -183,12 +120,9 @@ pub fn create_booklet(
             booklet_end_page += 4;
         }
         if booklet_end_page > page_count {
-            booklet_end_page = page_count;
+            booklet_end_page = page_count + booklet_config.tail_pad_page as u16;
         }
         booklet_idx += 1;
-        // if let Some(page) = create_page(src_pdf, booklet_idx as u16, booklet_start_page as u16, booklet_end_page as u16, binding_rule) {
-        //     doc.add_page(page);
-        // }
         pdf_creator::create_booklet(
             src_pdf,
             binding_rule,
