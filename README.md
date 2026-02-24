@@ -1,6 +1,6 @@
 # BCFBH - Booklet Creator For Binding by Hand
 
-一个用于将大型PDF文件拆分为多个小册子（booklet）的Rust工具。
+一个用于将大型PDF文件拆分为多个小册子（booklet）基于Rust的工具。
 注意打印时需要使用双面模式，并选择长边翻转
 ## 功能
 

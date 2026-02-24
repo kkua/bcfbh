@@ -1,12 +1,7 @@
-use std::{cell::OnceCell, path::PathBuf};
-
-use oxidize_pdf::operations::rotate;
+use std::{path::PathBuf};
+use native_dialog::{DialogBuilder, MessageLevel};
 use pdfium_render::prelude::*;
 
-// static PDFIUM_LIB: Pdfium = Pdfium::new(
-//             Pdfium::bind_to_library(Pdfium::pdfium_platform_library_name_at_path("./ffi/"))
-//                 .expect("无法绑定到pdfium库")
-//         );
 
 /// PDF文档持有者，同时保存Pdfium和PdfDocument以确保生命周期
 pub struct PdfDocumentHolder<'a> {
@@ -75,28 +70,35 @@ impl<'a> PdfDocumentHolder<'a> {
     }
 }
 
-/// 获取指定页面的图像数据（独立函数版本）
-///
-/// # 参数
-/// * `pages` - PDF页面对象
-/// * `page_idx` - 页面索引（从0开始）
-///
-/// # 返回
-/// 返回RGBA格式的图像字节数据
-pub fn get_page_image(pages: &PdfPages, page_idx: u16) -> Vec<u8> {
-    let page = pages.get(page_idx).unwrap();
-    let render_config = PdfRenderConfig::new()
-        .set_target_width(2000)
-        .set_maximum_height(2000)
-        .rotate(PdfPageRenderRotation::Degrees90, true);
-    page.render_with_config(&render_config)
-        .unwrap()
-        .as_rgba_bytes()
-}
-
 pub fn init_pdfium() -> Pdfium {
-    Pdfium::new(
-        Pdfium::bind_to_library(Pdfium::pdfium_platform_library_name_at_path("./ffi/"))
-            .expect("无法绑定到pdfium库"),
-    )
+    let lib_path = std::env::current_dir().unwrap().join("lib");
+    let lib = Pdfium::bind_to_library(Pdfium::pdfium_platform_library_name_at_path(&lib_path));
+    if lib.is_err() {
+        eprintln!("无法绑定到pdfium库");
+        eprintln!(
+            "请前往下载适合的版本，解压后将动态链接库文件放入文件夹 {}",
+            lib_path.to_string_lossy()
+        );
+        let url = "https://github.com/bblanchon/pdfium-binaries/releases";
+        eprintln!("下载地址 {}", url);
+        let yes = DialogBuilder::message()
+            .set_level(MessageLevel::Error)
+            .set_title("出错啦!")
+            .set_text(format!(
+                "请下载适合的版本，解压后放入文件夹 {}\n下载地址 {}",
+                lib_path.to_string_lossy(),
+                url
+            ))
+            .confirm()
+            .show()
+            .unwrap();
+
+        if yes {
+            let _ = webbrowser::open(url);
+        }
+        // sleep(Duration::from_secs(5));
+        // panic!("请按上述提示操作后重新运行")
+        std::process::exit(0)
+    }
+    Pdfium::new(lib.unwrap())
 }

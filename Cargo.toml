@@ -7,7 +7,10 @@ description = "Booklet Creator For Binding by Hand"
 [dependencies]
 oxidize-pdf = "1.6.13"
 pdfium-render = "0.8.37"
+# pdfium-auto = {version="0.3.0", features=[]}
 image = "0.25"
+native-dialog = {version = "0.9.6", features = ["windows_dpi_awareness"]}
+webbrowser = "*"
 
 [profile.release]
 lto = true
