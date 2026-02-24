@@ -44,11 +44,11 @@ cd bcfbh
 
 #### 放置库文件
 
-在项目根目录创建 `ffi` 文件夹，将下载的Pdfium库文件放入其中：
+在项目根目录创建 `lib` 文件夹，将下载的Pdfium库文件放入其中：
 
 ```
 bdfb/
-├── ffi/
+├── lib/
 │   ├── pdfium.dll          # Windows
 │   ├── libpdfium.so        # Linux
 │   └── libpdfium.dylib     # macOS
@@ -56,7 +56,7 @@ bdfb/
 └── ...
 ```
 
-> **注意**: 程序运行时会从 `./ffi/` 目录加载Pdfium动态链接库。
+> **注意**: 程序运行时会从 `./lib/` 目录加载Pdfium动态链接库。
 
 ### 3. 构建项目
 
@@ -101,7 +101,7 @@ cargo run --release
 
 ## 输出文件
 
-程序将生成多个PDF文件，命名格式为 `booklet_XX.pdf`，其中 `XX` 为两位数序号（如 `booklet_01.pdf`, `booklet_02.pdf` 等）。
+程序将生成多个PDF文件，命名格式为 `${src_filename}_XX.pdf`，其中 `XX` 为两位数序号（如 `input_01.pdf`, `input_02.pdf` 等）。
 
 ## 算法说明
 
@@ -111,14 +111,6 @@ cargo run --release
 2. **均匀分配**：当剩余页数较少时，会将页数均匀分配到各册
 3. **增量分配**：当剩余页数适中时，前几册会多分配1张纸
 
-## 依赖
-
-| 依赖库 | 版本 | 说明 |
-|--------|------|------|
-| [oxidize-pdf](https://crates.io/crates/oxidize-pdf) | 1.6.13 | PDF创建和编辑库 |
-| [pdfium-render](https://crates.io/crates/pdfium-render) | 0.8.37 | PDF渲染库，用于将页面渲染为图像提取 |
-| [image](https://crates.io/crates/image) | 0.25 | 图像处理库 |
-
 ## 项目结构
 
 ```
@@ -127,7 +119,6 @@ bdfb/
 ├── src/
 │   ├── main.rs         # 程序入口
 │   ├── booklet.rs      # 小册子拆分逻辑和配置结构体
-│   ├── pdf_edit.rs     # PDF编辑工具函数
 │   ├── pdf_creator.rs  # PDF小册子页面创建
 │   └── pdf_render.rs   # PDF渲染和页面图像提取
 └── README.md           # 本文件
