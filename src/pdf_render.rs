@@ -1,7 +1,6 @@
-use std::{path::PathBuf};
 use native_dialog::{DialogBuilder, MessageLevel};
 use pdfium_render::prelude::*;
-
+use std::path::PathBuf;
 
 /// PDF文档持有者，同时保存Pdfium和PdfDocument以确保生命周期
 pub struct PdfDocumentHolder<'a> {
@@ -56,9 +55,10 @@ impl<'a> PdfDocumentHolder<'a> {
         // 72 DPI: 595 x 842 像素
         // 150 DPI: 1240 x 1754 像素
         // 300 DPI: 2480 x 3508 像素
+        let target_height = 3508;
         let render_config = PdfRenderConfig::new()
-            .set_target_height(3508)
-            .set_maximum_height(3508)
+            .set_target_height(target_height)
+            .set_maximum_height(target_height)
             .rotate(rotate, true);
         let bitmap = page.render_with_config(&render_config).unwrap();
         let width = bitmap.width() as u32;

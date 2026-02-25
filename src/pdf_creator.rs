@@ -158,15 +158,29 @@ fn create_page(
     let half_h = h / 2.0;
     let half_w = w / 2.0;
     // 等比缩放
-    // let margin_tb = margin * h / w / 2.0; ==> margin * h/2.0 / w;
+    // let margin_tb = margin * h / w / 2.0; ==> margin * h / 2.0 / w; ==> margin * (h / 2.0) / w;
     let margin_tb = margin * half_h / w;
-
-    let (img_bottom, img_bottom_idx, img_top, img_top_idx) = if binding_rule.binding_at_middle {
-        (img_low, page_low_idx, img_high, page_high_idx)
-    } else {
-        (img_high, page_high_idx, img_low, page_low_idx)
-    };
-
+    let margin_tb2 = 2.0 * margin_tb;
+    // let v_1d5mm = 1.5*v_1mm_to_pt;
+    let small_margin_tb = 0.6 * margin_tb;
+    let ((img_bottom, img_bottom_idx, bottom_y), (img_top, img_top_idx, top_y)) =
+        if binding_rule.binding_at_middle {
+            (
+                (img_low, page_low_idx, small_margin_tb),
+                (
+                    img_high,
+                    page_high_idx,
+                    half_h + margin_tb2 - small_margin_tb,
+                ),
+            )
+        } else {
+            (
+                (img_high, page_high_idx, margin_tb2 - small_margin_tb),
+                (img_low, page_low_idx, half_h + small_margin_tb),
+            )
+        };
+    let img_width = w - 2.0 * margin;
+    let img_height = half_h - margin_tb2;
     let v_12mm = 12.0 * v_1mm_to_pt;
     if let Some(img) = img_bottom {
         new_page.add_image(format!("{}", img_bottom_idx), img);
@@ -174,9 +188,9 @@ fn create_page(
             .draw_image(
                 format!("{}", img_bottom_idx).as_str(),
                 margin,
-                margin_tb,
-                w - v_12mm,
-                half_h - margin_tb,
+                bottom_y,
+                img_width,
+                img_height,
             )
             .unwrap();
     }
@@ -186,14 +200,14 @@ fn create_page(
             .draw_image(
                 format!("{}", img_top_idx).as_str(),
                 margin,
-                half_h + margin_tb,
-                w - v_12mm,
-                half_h - margin_tb,
+                top_y,
+                img_width,
+                img_height,
             )
             .unwrap();
     }
 
-    // 间隔1.2mm
+    // 间隔12mm
     let dot_space = v_12mm;
     let padding = 6.0 * v_1mm_to_pt;
     let ((start_x, start_y), (to_x, to_y)) = if is_sheet_back {

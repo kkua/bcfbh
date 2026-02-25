@@ -1,5 +1,5 @@
-use std::{path::PathBuf};
 use crate::{pdf_creator, pdf_render::PdfDocumentHolder};
+use std::path::PathBuf;
 
 pub struct BindingRule {
     /// 输入PDF文件路径
@@ -102,10 +102,7 @@ fn calc_booklet_pages(page_count: u32, sheets_per_booklet: u32) -> BookletConfig
     }
 }
 
-pub fn create_booklet(
-    src_pdf: &PdfDocumentHolder,
-    binding_rule: &BindingRule,
-) {
+pub fn create_booklet(src_pdf: &PdfDocumentHolder, binding_rule: &BindingRule) {
     let page_count = src_pdf.get_page_count();
     let booklet_config =
         calc_booklet_pages(page_count as u32, binding_rule.sheets_per_booklet as u32);
