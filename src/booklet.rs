@@ -1,3 +1,5 @@
+use oxidize_pdf::page;
+
 use crate::{pdf_creator, pdf_render::PdfDocumentHolder};
 use std::path::PathBuf;
 
@@ -11,6 +13,10 @@ pub struct BindingRule {
 
     /// 装订方式（默认为true:在中间装订）
     pub binding_at_middle: bool,
+    // 是否有封面封底（第一页和最后一页）
+    pub has_cover: bool,
+    // 是否仅打印正文（不保留封面封底）
+    pub keep_cover: bool,
     // /// 是否在首页前添加空白页作为封面
     // pub add_blank_cover: bool,
     // /// 是否添加页码
@@ -28,6 +34,8 @@ impl Default for BindingRule {
             output_dir: PathBuf::new(),
             sheets_per_booklet: 10,
             binding_at_middle: true,
+            has_cover: false,
+            keep_cover: false,
         }
     }
 }
@@ -55,42 +63,72 @@ pub struct BookletConfig {
     pub add_sheet_booklet_count: u32,
     /// 最后一册的填充页数
     pub tail_pad_page: u32,
+    // /// 源文件有封面封底
+    // has_cover: bool,
+    // /// 保留封面封底
+    // keep_cover: bool,
 }
 
 /// 计算每册的纸张数量
-fn calc_booklet_pages(page_count: u32, sheets_per_booklet: u32) -> BookletConfig {
+fn calc_booklet_sheets(
+    page_count: u32,
+    sheets_per_booklet: u32,
+    has_cover: bool,
+    keep_cover: bool,
+) -> BookletConfig {
     // let last_add = page_count % 4;
     // 对齐到4的倍数
+    // let mut keep_cover = keep_cover;
+    let page_count = if has_cover {
+        if keep_cover {
+            // 封面和封底背面各增加一张空白页
+            page_count + 2
+        } else {
+            page_count - 2
+        }
+    } else {
+        // keep_cover = false;
+        page_count
+    };
+
     let total = ((page_count + 3) / 4) * 4;
     let last_add = total - page_count;
+    // println!(
+    //     "末尾添加{}页空白页。若在其他位置插入请先自行修改源PDF",
+    //     last_add
+    // );
     // 每册对应的页数
     let pages_per_booklet = sheets_per_booklet * 4;
     // 获取册数
     let mut booklet_count = total / pages_per_booklet;
     // 最后一册的页数
-    let last_booklet_pages = total % pages_per_booklet;
+    let last_booklet_sheets = total % pages_per_booklet;
     let mut booklet_sheets = sheets_per_booklet;
     // 重新分配每册页数
-    if last_booklet_pages / 4 <= booklet_count {
+    if last_booklet_sheets / 4 <= booklet_count {
         // 最后一册全部分给前几册，每册多分1张纸
         let res = BookletConfig {
             booklet_sheets,
-            add_sheet_booklet_count: last_booklet_pages / 4,
+            add_sheet_booklet_count: last_booklet_sheets / 4,
             tail_pad_page: last_add,
+            // has_cover,
+            // keep_cover,
         };
         // booklet_sheets += 1;
         return res;
-    } else if last_booklet_pages * 2 < pages_per_booklet {
-        // 小册子均分一下
+    } else if last_booklet_sheets * 4 < pages_per_booklet * 3 {
+        // 最后一册纸张数小于期望页数的3/4，册数不变，页数均分
         booklet_count += 1;
         // booklet_sheets 一定会小于 paper_count_per_booklet
-        booklet_sheets = total / booklet_count;
+        booklet_sheets = total / booklet_count / 4;
         // remain_booklet_sheets 一定会小于 booklet_sheets
         let remain_booklet_sheets = (booklet_sheets * 4 * booklet_count - total) / 4;
         let booklet_config = BookletConfig {
             booklet_sheets,
             add_sheet_booklet_count: remain_booklet_sheets,
             tail_pad_page: last_add,
+            // has_cover,
+            // keep_cover,
         };
         return booklet_config;
     } else {
@@ -98,16 +136,27 @@ fn calc_booklet_pages(page_count: u32, sheets_per_booklet: u32) -> BookletConfig
             booklet_sheets,
             add_sheet_booklet_count: 0,
             tail_pad_page: last_add,
+            // has_cover,
+            // keep_cover,
         }
     }
 }
 
 pub fn create_booklet(src_pdf: &PdfDocumentHolder, binding_rule: &BindingRule) {
-    let page_count = src_pdf.get_page_count();
-    let booklet_config =
-        calc_booklet_pages(page_count as u32, binding_rule.sheets_per_booklet as u32);
+    let has_cover = binding_rule.has_cover;
+    let keep_cover = binding_rule.keep_cover;
+    let (mut page_idx, page_count) = if has_cover && !keep_cover {
+        (1u16, src_pdf.get_page_count() - 2)
+    } else {
+        (0u16, src_pdf.get_page_count())
+    };
+    let booklet_config = calc_booklet_sheets(
+        page_count as u32,
+        binding_rule.sheets_per_booklet as u32,
+        has_cover,
+        keep_cover,
+    );
     let mut booklet_idx = 0u16;
-    let mut page_idx = 0u16;
 
     let pages_per_booklet = (booklet_config.booklet_sheets * 4) as u16;
     while page_idx < page_count {
@@ -116,14 +165,24 @@ pub fn create_booklet(src_pdf: &PdfDocumentHolder, binding_rule: &BindingRule) {
         if (booklet_idx as u32) < booklet_config.add_sheet_booklet_count {
             booklet_end_page += 4;
         }
+        let is_last_booklet = booklet_end_page >= page_count;
         if booklet_end_page > page_count {
             booklet_end_page = page_count + booklet_config.tail_pad_page as u16;
+        }
+        if has_cover && keep_cover {
+            if booklet_idx == 0 {
+                booklet_end_page -= 1;
+            } else if is_last_booklet {
+                // 封面背面的空白页已经包含，只需要加1
+                booklet_end_page += 1;
+            }
         }
         booklet_idx += 1;
         pdf_creator::create_booklet(
             src_pdf,
             binding_rule,
             booklet_idx,
+            is_last_booklet,
             booklet_start_page,
             booklet_end_page,
         );

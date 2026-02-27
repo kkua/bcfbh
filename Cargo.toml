@@ -1,6 +1,6 @@
 [package]
 name = "bcfbh"
-version = "0.1.1"
+version = "0.2.1"
 edition = "2024"
 description = "Booklet Creator For Binding by Hand"
 
@@ -9,7 +9,7 @@ oxidize-pdf = "1.6.13"
 pdfium-render = "0.8.37"
 # pdfium-auto = {version="0.3.0", features=[]}
 image = "0.25"
-native-dialog = {version = "0.9.6", features = ["windows_dpi_awareness"]}
+native-dialog = {version = "0.9.6", features = ["windows_dpi_awareness", "windows_visual_styles"]}
 webbrowser = "*"
 
 [profile.release]

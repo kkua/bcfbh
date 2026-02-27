@@ -20,6 +20,24 @@ fn main() {
         .open_single_dir()
         .show()
         .unwrap();
+    let has_cover = DialogBuilder::message()
+        .set_level(native_dialog::MessageLevel::Info)
+        .set_title("装订参数")
+        .set_text("是否有封面")
+        .confirm()
+        .show()
+        .unwrap_or(false);
+    let mut keep_cover = false;
+    if has_cover {
+        keep_cover = DialogBuilder::message()
+            .set_level(native_dialog::MessageLevel::Info)
+            .set_title("装订参数")
+            .set_text("是否保留封面")
+            .confirm()
+            .show()
+            .unwrap_or(false);
+    }
+
     // println!("{}", out_path.to_string_lossy());
     let pdfium = pdf_render::init_pdfium();
     let input_path = path;
@@ -27,6 +45,8 @@ fn main() {
     let binding_rule = booklet::BindingRule {
         binding_at_middle: true,
         sheets_per_booklet: 10,
+        has_cover,
+        keep_cover,
         ..binding_rule
     }
     .set_output_path(&out_path);

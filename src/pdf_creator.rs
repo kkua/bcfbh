@@ -1,3 +1,5 @@
+use std::u16;
+
 use crate::booklet::BindingRule;
 use crate::pdf_render::PdfDocumentHolder;
 use oxidize_pdf::Color;
@@ -12,13 +14,15 @@ use pdfium_render::prelude::PdfDocumentMetadataTagType;
 /// # 参数
 /// * `src_pdf` - 源PDF文档容器
 /// * `binding_rule` - 装订规则
-/// * `booklet_idx` - 册子索引
+/// * `booklet_num` - 册子编号
+/// * `is_last_booklet` - 是否是最后一册
 /// * `booklet_start_page` - 小册子开始页索引(包含)
 /// * `booklet_end_page` - 小册子结束页索引(不包含)
 pub fn create_booklet(
     src_pdf: &PdfDocumentHolder,
     binding_rule: &BindingRule,
-    booklet_idx: u16,
+    booklet_num: u16,
+    is_last_booklet: bool,
     booklet_start_page: u16,
     booklet_end_page: u16,
 ) {
@@ -29,7 +33,7 @@ pub fn create_booklet(
         .file_prefix()
         .expect("没有文件名")
         .to_string_lossy();
-    doc.set_title(format!("booklet #{}", booklet_idx));
+    doc.set_title(format!("booklet #{}", booklet_num));
     let mut page_idx = booklet_start_page;
     while page_idx < booklet_end_page {
         if let Some(page) = create_page(
@@ -37,7 +41,8 @@ pub fn create_booklet(
             page_idx,
             booklet_start_page,
             booklet_end_page,
-            booklet_idx,
+            booklet_num,
+            is_last_booklet,
             binding_rule,
         ) {
             doc.add_page(page);
@@ -51,13 +56,13 @@ pub fn create_booklet(
         "{}/{}_{:02}.pdf",
         binding_rule.output_dir.display(),
         file_name,
-        booklet_idx
+        booklet_num
     ))
     .unwrap();
 
     println!(
         "完成第{}册，共{}页, 开始页: {}, 结束页: {}",
-        booklet_idx,
+        booklet_num,
         booklet_end_page - booklet_start_page,
         booklet_start_page,
         booklet_end_page
@@ -107,23 +112,32 @@ fn create_page(
     group_start_idx: u16,
     group_end_idx: u16,
     booklet_num: u16,
+    // padded_page_count: &mut u16,
+    is_last_booklet: bool,
     binding_rule: &BindingRule,
 ) -> Option<Page> {
-    let page_low_idx = page_idx;
-    let mut page_high_idx = group_end_idx - page_idx + group_start_idx - 1;
-    let binding_at_middle = binding_rule.binding_at_middle;
-    if page_low_idx >= page_high_idx {
+    let src_pdf_page_count = src_pdf.get_page_count();
+    let page_low_idx;
+    let page_high_idx;
+
+    if let Some((li, hi)) = calc_sheet_lh_page_idx(
+        src_pdf_page_count,
+        page_idx,
+        group_start_idx,
+        group_end_idx,
+        booklet_num == 1,
+        is_last_booklet,
+        binding_rule,
+    ) {
+        page_low_idx = li;
+        page_high_idx = hi;
+    } else {
         // 本册结束了
         return None;
-    }
-    if !binding_at_middle {
-        page_high_idx = (group_end_idx - group_start_idx + 1) / 2 + page_idx;
-    }
-
-    let page_count = src_pdf.get_page_count();
-
+    };
+    let binding_at_middle = binding_rule.binding_at_middle;
     let is_sheet_back = page_idx % 2 != 0;
-    let img_low = if page_low_idx >= page_count {
+    let img_low = if page_low_idx >= src_pdf_page_count {
         // 空白的情况，没有低页
         None
     } else {
@@ -137,7 +151,7 @@ fn create_page(
         )
     };
     println!("{}, {}", page_low_idx, page_high_idx);
-    let img_high = if page_high_idx >= page_count {
+    let img_high = if page_high_idx >= src_pdf_page_count {
         // 空白的情况，没有高页
         None
     } else {
@@ -230,4 +244,77 @@ fn create_page(
             .write(format!("^- {} -^", booklet_num).as_str());
     }
     return Some(new_page);
+}
+
+fn calc_sheet_lh_page_idx(
+    page_count: u16,
+    page_idx: u16,
+    group_start_idx: u16,
+    group_end_idx: u16,
+    // booklet_num: u16,
+    is_first_booklet: bool,
+    is_last_booklet: bool,
+    binding_rule: &BindingRule,
+) -> Option<(u16, u16)> {
+    let has_cover = binding_rule.has_cover;
+    let keep_cover = binding_rule.keep_cover;
+    let mut page_low_idx = page_idx;
+    // let mut page_idx = page_idx;
+    let binding_at_middle = binding_rule.binding_at_middle;
+    let mut page_high_idx = group_end_idx - page_idx + group_start_idx - 1;
+    // 第一册
+    if is_first_booklet {
+        if has_cover && keep_cover {
+            if page_idx == 1 {
+                page_low_idx = u16::MAX;
+            } else if page_idx > 1 {
+                // page_idx -= 1;
+                page_low_idx = page_idx - 1;
+            } else {
+                // == 0
+            }
+        } else if has_cover && !keep_cover {
+            if page_idx == 0 {
+                // group_start_idx = 1;
+            }
+        }
+    }
+
+    if page_low_idx < u16::MAX && page_low_idx >= page_high_idx {
+        // 本册结束了
+        return None;
+    }
+    // 边缘装订
+    if !binding_at_middle {
+        if has_cover && keep_cover {}
+        if is_first_booklet && is_last_booklet {
+            page_high_idx = (group_end_idx - group_start_idx - 1) / 2 + page_idx;
+        } else if is_first_booklet || is_last_booklet {
+            page_high_idx = (group_end_idx - group_start_idx) / 2 + page_idx;
+        } else {
+            page_high_idx = (group_end_idx - group_start_idx + 1) / 2 + page_idx;
+        }
+    }
+    if is_last_booklet {
+        if has_cover && keep_cover {
+            if page_high_idx == page_count - 1 {
+                page_high_idx = u16::MAX;
+            } else if page_high_idx == group_end_idx - 1 {
+                page_high_idx = page_count - 1;
+            }
+
+            // if page_idx == group_start_idx {
+            //     page_high_idx = page_count - 1;
+            // } else if page_idx < group_start_idx + 4 {
+            //     if page_high_idx == page_count - 1 {
+            //         page_high_idx = u16::MAX;
+            //     }
+            // }
+        } else if has_cover && !keep_cover {
+            if page_high_idx >= page_count {
+                page_high_idx = u16::MAX;
+            }
+        }
+    }
+    Some((page_low_idx, page_high_idx))
 }
