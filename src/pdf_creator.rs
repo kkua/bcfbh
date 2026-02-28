@@ -119,8 +119,8 @@ fn create_page(
     let src_pdf_page_count = src_pdf.get_page_count();
     let page_low_idx;
     let page_high_idx;
-
-    if let Some((li, hi)) = calc_sheet_lh_page_idx(
+    let is_sheet_back;
+    if let Some((li, hi, is_back)) = calc_sheet_lh_page_idx(
         src_pdf_page_count,
         page_idx,
         group_start_idx,
@@ -131,12 +131,12 @@ fn create_page(
     ) {
         page_low_idx = li;
         page_high_idx = hi;
+        is_sheet_back = is_back;
     } else {
         // 本册结束了
         return None;
     };
     let binding_at_middle = binding_rule.binding_at_middle;
-    let is_sheet_back = page_idx % 2 != 0;
     let img_low = if page_low_idx >= src_pdf_page_count {
         // 空白的情况，没有低页
         None
@@ -150,7 +150,7 @@ fn create_page(
                 .unwrap(),
         )
     };
-    println!("{}, {}", page_low_idx, page_high_idx);
+    println!("{}, {}, {}", page_low_idx, page_high_idx, is_sheet_back);
     let img_high = if page_high_idx >= src_pdf_page_count {
         // 空白的情况，没有高页
         None
@@ -255,28 +255,36 @@ fn calc_sheet_lh_page_idx(
     is_first_booklet: bool,
     is_last_booklet: bool,
     binding_rule: &BindingRule,
-) -> Option<(u16, u16)> {
+) -> Option<(u16, u16, bool)> {
     let has_cover = binding_rule.has_cover;
     let keep_cover = binding_rule.keep_cover;
     let mut page_low_idx = page_idx;
     // let mut page_idx = page_idx;
     let binding_at_middle = binding_rule.binding_at_middle;
     let mut page_high_idx = group_end_idx - page_idx + group_start_idx - 1;
+    let mut is_sheet_back = page_idx % 2 != 0;
     // 第一册
     if is_first_booklet {
         if has_cover && keep_cover {
             if page_idx == 1 {
                 page_low_idx = u16::MAX;
+                // is_sheet_back = true;
             } else if page_idx > 1 {
                 // page_idx -= 1;
                 page_low_idx = page_idx - 1;
             } else {
                 // == 0
+                // is_sheet_back = false;
             }
         } else if has_cover && !keep_cover {
             if page_idx == 0 {
                 // group_start_idx = 1;
             }
+            is_sheet_back = !is_sheet_back;
+        }
+    } else {
+        if has_cover {
+            is_sheet_back = !is_sheet_back;
         }
     }
 
@@ -301,20 +309,16 @@ fn calc_sheet_lh_page_idx(
                 page_high_idx = u16::MAX;
             } else if page_high_idx == group_end_idx - 1 {
                 page_high_idx = page_count - 1;
+                is_sheet_back = false;
+            } else if page_high_idx == group_end_idx - 2 {
+                is_sheet_back = true;
             }
-
-            // if page_idx == group_start_idx {
-            //     page_high_idx = page_count - 1;
-            // } else if page_idx < group_start_idx + 4 {
-            //     if page_high_idx == page_count - 1 {
-            //         page_high_idx = u16::MAX;
-            //     }
-            // }
         } else if has_cover && !keep_cover {
             if page_high_idx >= page_count {
                 page_high_idx = u16::MAX;
+                is_sheet_back = page_idx % 2 == 0;
             }
         }
     }
-    Some((page_low_idx, page_high_idx))
+    Some((page_low_idx, page_high_idx, is_sheet_back))
 }
