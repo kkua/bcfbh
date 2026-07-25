@@ -17,10 +17,10 @@ static APP_REF: OnceLock<Weak<App>> = OnceLock::new();
 macro_rules! def_cb {
 
     ($ui:expr, $event_handler:ident, $logic_fn:ident) => {{
-        // 1. 创建弱引用
+        // 创建弱引用
         let ui_handle = $ui.as_weak();
 
-        // 2. 注册回调，闭包负责提升句柄并调用逻辑函数
+        // 注册回调，闭包负责提升句柄并调用逻辑函数
         $ui.$event_handler({
             move || {
             $logic_fn(ui_handle.clone())
@@ -60,12 +60,23 @@ fn on_add_pdf(ui_handle: slint::Weak<App>) {
         Some(ui) => ui,
         None => return, // UI 可能已经被销毁，直接返回
     };
-    let path_vec = DialogBuilder::file()
+    let path_vec = match DialogBuilder::file()
         .add_filter("PDF", ["pdf"])
         .set_title("选择源文件")
         .open_multiple_file()
         .show()
-        .unwrap();
+    {
+        Ok(res) => res,
+        Err(native_dialog::Error::MissingDep) => {
+            eprintln!("缺失依赖，请先安装 Zenity/KDialog/YAD");
+            return;
+        }
+        Err(e) => {
+            eprintln!("系统错误，无法打开文件选择对话框");
+            eprintln!("错误类型：{}", e);
+            return;
+        }
+    };
 
     if path_vec.is_empty() {
         return;
