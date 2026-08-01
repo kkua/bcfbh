@@ -288,12 +288,12 @@ where
     doc.save(path).unwrap();
 }
 
-const A4_H: f32 = 842.0;
-const A4_W: f32 = 595.0;
+const MM_2_PT: f32 = 1.0 * 72.0 / 25.4;
+const A4_H: f32 = 297.0 * MM_2_PT;
+const A4_W: f32 = 210.0 * MM_2_PT;
 const PAGE_H: f32 = A4_H;
 const PAGE_W: f32 = A4_W;
 const PAGE_H_HALF: f32 = A4_H / 2.0;
-const MM_2_PT: f32 = 1.0 * 72.0 / 25.4;
 const MARGIN_Y: f32 = MM_2_PT * 2.0;
 const PRINT_BOX_H: f32 = PAGE_H_HALF - MARGIN_Y * 2.0;
 const PRINT_BOX_W: f32 = PAGE_W * PRINT_BOX_H / PAGE_H_HALF;
@@ -312,16 +312,17 @@ pub fn add_page(
     binding_at_middle: bool,
     is_sheet_back: bool,
 ) {
-    let lpage_num = if is_sheet_back {
-        page_pair.0
-    } else {
-        page_pair.1
-    };
-    let rpage_num = if is_sheet_back {
-        page_pair.1
-    } else {
-        page_pair.0
-    };
+    // let lpage_num = if is_sheet_back {
+    //     page_pair.1
+    // } else {
+    //     page_pair.1
+    // };
+    // let rpage_num = if is_sheet_back {
+    //     page_pair.0
+    // } else {
+    //     page_pair.0
+    // };
+    let (rpage_num, lpage_num) = page_pair;
     let rotate_180 = !binding_at_middle;
 
     let mut l_content_flow = Vec::with_capacity(100);
@@ -613,7 +614,7 @@ fn add_page_flow(
     const DOT_WID: f32 = 1.5;
     const DOT_SPACE: f32 = 12.0 * MM_2_PT; // 12mm
     const DOT_NUM: f32 = (PAGE_W / DOT_SPACE).floor();
-    const START_X: f32 = (PAGE_W - (DOT_SPACE + DOT_WID) * DOT_NUM) / 2.0;
+    const START_X: f32 = (PAGE_W - DOT_SPACE * DOT_NUM) / 2.0;
     const INT_DOT_SPACE: i32 = DOT_SPACE.round() as i32;
     merge_content_flow.extend_from_slice(&[
         // --- 绘制正中间的灰色小圆点虚线 ---
