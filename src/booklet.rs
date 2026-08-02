@@ -82,25 +82,15 @@ fn calc_booklet_sheets(
 ) -> BookletConfig {
     // let last_add = page_count % 4;
     // 对齐到4的倍数
-    // let mut keep_cover = keep_cover;
-    let page_count = if has_cover {
-        if keep_cover {
-            // 封面和封底背面各增加一张空白页
-            page_count + 2
-        } else {
-            page_count - 2
-        }
+    let page_count = if has_cover && keep_cover {
+        // 封面和封底背面各增加一张空白页
+        page_count + 2
     } else {
-        // keep_cover = false;
         page_count
     };
 
     let total = ((page_count + 3) / 4) * 4;
     let last_add = total - page_count;
-    // println!(
-    //     "末尾添加{}页空白页。若在其他位置插入请先自行修改源PDF",
-    //     last_add
-    // );
     // 每册对应的页数
     let pages_per_booklet = sheets_per_booklet * 4;
     // 获取册数
@@ -108,6 +98,15 @@ fn calc_booklet_sheets(
     // 最后一册的页数
     let last_booklet_sheets = total % pages_per_booklet;
     let mut booklet_sheets = sheets_per_booklet;
+    if booklet_count <= 1 {
+        return BookletConfig {
+            booklet_sheets: page_count / 4,
+            add_sheet_booklet_count: 0,
+            tail_pad_page: last_add,
+            // has_cover,
+            // keep_cover,
+        };
+    }
     // 重新分配每册页数
     if last_booklet_sheets / 4 <= booklet_count {
         // 最后一册全部分给前几册，每册多分1张纸
@@ -123,7 +122,7 @@ fn calc_booklet_sheets(
     } else if last_booklet_sheets * 4 < pages_per_booklet * 3 {
         // 最后一册纸张数小于期望页数的3/4，册数不变，页数均分
         booklet_count += 1;
-        // booklet_sheets 一定会小于 paper_count_per_booklet
+        // booklet_sheets 一定会小于 sheets_per_booklet
         booklet_sheets = total / booklet_count / 4;
         // remain_booklet_sheets 一定会小于 booklet_sheets
         let remain_booklet_sheets = (total - booklet_sheets * 4 * booklet_count) / 4;
@@ -171,15 +170,20 @@ pub fn create_booklet(src_pdf: &Document, binding_rule: &BindingRule) {
             booklet_end_page += 4;
         }
         let is_last_booklet = booklet_end_page >= page_count;
-        if booklet_end_page > page_count {
-            booklet_end_page = page_count + booklet_config.tail_pad_page as i32;
+        if is_last_booklet {
+            booklet_end_page = page_count
+                + booklet_config.tail_pad_page as i32
+                + if has_cover && !keep_cover { 1 } else { 0 };
         }
-        if has_cover && keep_cover {
-            if booklet_idx == 0 {
-                booklet_end_page -= 1;
-            } else if is_last_booklet {
-                // 封面背面的空白页已经包含，只需要加1
-                booklet_end_page += 1;
+        if has_cover {
+            if keep_cover {
+                let is_first_booklet = booklet_idx == 0;
+                if is_first_booklet {
+                    booklet_end_page -= 1;
+                    if is_last_booklet {
+                        booklet_end_page += 1;
+                    }
+                }
             }
         }
         booklet_idx += 1;
@@ -190,6 +194,7 @@ pub fn create_booklet(src_pdf: &Document, binding_rule: &BindingRule) {
             is_last_booklet,
             booklet_start_page,
             booklet_end_page,
+            page_count,
         );
         page_idx = booklet_end_page;
     }

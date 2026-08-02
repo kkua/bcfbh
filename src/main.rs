@@ -1,5 +1,4 @@
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
-use native_dialog::DialogBuilder;
 
 mod booklet;
 mod cache;

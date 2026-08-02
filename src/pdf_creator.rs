@@ -25,16 +25,16 @@ pub fn do_create_booklet(
     is_last_booklet: bool,
     booklet_start_page: i32,
     booklet_end_page: i32,
+    src_fin_page_cnt: i32,
 ) {
     let is_first_booklet = booklet_num == 1;
 
     if is_first_booklet {
         cache::clear();
     }
-    let page_count = src_pdf.get_pages().len() as i32;
     let is_auto_double_side = binding_rule.auto_double_side;
     let sheet_pages_vec = calc_page_on_sheet(
-        page_count,
+        src_fin_page_cnt,
         booklet_start_page,
         booklet_end_page,
         is_first_booklet,
@@ -222,28 +222,38 @@ fn calc_page_on_sheet(
     let mut page_idx = group_start_idx;
     while page_idx < group_end_idx {
         let mut page_low_idx = page_idx;
-        let mut page_high_idx = group_end_idx - page_idx + group_start_idx - 1;
+        let page_in_booklet_idx = page_idx - group_start_idx;
+        let mut page_high_idx = group_end_idx - 1 - page_in_booklet_idx;
         // 第一册
         if is_first_booklet {
             if has_cover && keep_cover {
                 if page_idx == 1 {
+                    // 插入空白页
                     page_low_idx = i32::MAX;
-                    // is_sheet_back = true;
                 } else if page_idx > 1 {
-                    // page_idx -= 1;
                     page_low_idx = page_idx - 1;
                 } else {
                     // == 0
-                    // is_sheet_back = false;
                 }
-            } else if has_cover && !keep_cover {
-                if page_idx == 0 {
-                    // group_start_idx = 1;
+            }
+        }
+        if is_last_booklet {
+            if has_cover && keep_cover {
+                if page_in_booklet_idx == 0 {
+                    page_high_idx = page_count - 1;
+                } else if page_in_booklet_idx == 1 {
+                    page_high_idx = i32::MAX;
+                } else if page_in_booklet_idx > 1 {
+                    page_high_idx = if page_high_idx >= page_count - 1 {
+                        i32::MAX
+                    } else {
+                        page_high_idx + 1
+                    };
                 }
             }
         }
 
-        if page_low_idx < i32::MAX && page_low_idx >= page_high_idx {
+        if page_low_idx < i32::MAX && page_low_idx > page_high_idx {
             // 本册结束了
             // return None;
             break;
@@ -251,29 +261,31 @@ fn calc_page_on_sheet(
 
         // 边缘装订
         if !binding_at_middle {
-            if has_cover && keep_cover {}
-            if is_first_booklet && is_last_booklet {
-                page_high_idx = (group_end_idx - group_start_idx - 1) / 2 + page_idx;
-            } else if is_first_booklet || is_last_booklet {
-                page_high_idx = (group_end_idx - group_start_idx) / 2 + page_idx;
-            } else {
-                page_high_idx = (group_end_idx - group_start_idx + 1) / 2 + page_idx;
-            }
-        }
-        if is_last_booklet {
             if has_cover && keep_cover {
-                if page_high_idx == page_count - 1 {
-                    page_high_idx = i32::MAX;
-                } else if page_high_idx == group_end_idx - 1 {
-                    page_high_idx = page_count - 1;
-                } else if page_high_idx == group_end_idx - 2 {
+                if is_first_booklet && is_last_booklet {
+                    page_high_idx = (group_end_idx - group_start_idx + 1) / 2 + page_idx;
+                } else if is_first_booklet || is_last_booklet {
+                    page_high_idx = (group_end_idx - group_start_idx) / 2 + page_idx;
+                } else {
+                    page_high_idx = (group_end_idx - group_start_idx - 1) / 2 + page_idx;
                 }
-            } else if has_cover && !keep_cover {
-                if page_high_idx >= page_count {
+                if page_idx == 1 {
                     page_high_idx = i32::MAX;
                 }
             }
+            // if is_first_booklet && is_last_booklet {
+            //     page_high_idx = (group_end_idx - group_start_idx - 1) / 2 + page_idx;
+            // } else if is_first_booklet || is_last_booklet {
+            //     page_high_idx = (group_end_idx - group_start_idx) / 2 + page_idx;
+            // } else {
+            //     page_high_idx = (group_end_idx - group_start_idx + 1) / 2 + page_idx;
+            // }
         }
+
+        if page_high_idx >= page_count {
+            page_high_idx = i32::MAX;
+        }
+
         res.push((page_low_idx, page_high_idx));
         page_idx += 1;
     }
@@ -312,16 +324,6 @@ pub fn add_page(
     binding_at_middle: bool,
     is_sheet_back: bool,
 ) {
-    // let lpage_num = if is_sheet_back {
-    //     page_pair.1
-    // } else {
-    //     page_pair.1
-    // };
-    // let rpage_num = if is_sheet_back {
-    //     page_pair.0
-    // } else {
-    //     page_pair.0
-    // };
     let (rpage_num, lpage_num) = page_pair;
     let rotate_180 = !binding_at_middle;
 
@@ -396,35 +398,10 @@ fn build_half_page(
 
         // cos(θ) sin(θ) -sin(θ) cos(θ) tx ty cm
         // a = sx, b , c , d = sy, e = tx, f = ty
-        // let ctm_sx = if rotate_180 { -scale } else { scale };
-        // let ctm_b = "0";
-        // let ctm_c = "0";
-        // let ctm_sy = if rotate_180 { -scale } else { scale };
-        // let ctm_tx = if left {
-        //     space_x + MARGIN_X
-        // } else {
-        //     PAGE_W_HALF + MARGIN_X + space_x
-        // };
         let ctm_a = "0";
         let ctm_b = if r180 { -scale } else { scale };
         let ctm_d = "0";
         let ctm_c = if r180 { scale } else { -scale };
-
-        // let ctm_tx = if rotate_180 {
-        //     if left {
-        //         PRINT_BOX_W + MARGIN_X + space_x
-        //     } else {
-        //         PRINT_BOX_W + PAGE_W_HALF + MARGIN_X + space_x
-        //     }
-        // } else {
-        //     ctm_tx
-        // };
-        // let ctm_ty = if rotate_180 {
-        //     PAGE_H - MARGIN_Y - space_y
-        // } else {
-        //     MARGIN_Y + space_y
-        // };
-
         let ctm_tx = if r180 {
             MARGIN_X + space_x
         } else {
@@ -631,7 +608,7 @@ fn add_page_flow(
             ],
         ),
         Operation::new("m", vec![START_X.into(), PAGE_H_HALF.into()]), // 移动到 起点
-        Operation::new("l", vec![PAGE_W.into(), PAGE_H_HALF.into()]),  // 画线到 终点
+        Operation::new("l", vec![(PAGE_W + DOT_SPACE).into(), PAGE_H_HALF.into()]), // 画线到 终点
         Operation::new("S", vec![]),                                   // 描边
         Operation::new("Q", vec![]),                                   // 恢复图形状态
     ]);
