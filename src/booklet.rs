@@ -100,7 +100,7 @@ fn calc_booklet_sheets(
     let mut booklet_sheets = sheets_per_booklet;
     if booklet_count <= 1 {
         return BookletConfig {
-            booklet_sheets: page_count / 4,
+            booklet_sheets: total / 4,
             add_sheet_booklet_count: 0,
             tail_pad_page: last_add,
             // has_cover,
