@@ -1,5 +1,7 @@
 use std::{
+    cell::Cell,
     path::{Path, PathBuf},
+    rc::Rc,
     sync::OnceLock,
     thread,
     time::Duration,
@@ -7,7 +9,10 @@ use std::{
 
 use lopdf::Document;
 use native_dialog::DialogBuilder;
-use slint::{ComponentHandle, Image, Model, SharedPixelBuffer, SharedString, VecModel, Weak};
+use slint::{
+    ComponentHandle, Image, Model, SharedPixelBuffer, SharedString, Timer, VecModel, Weak,
+    winit_030::WinitWindowAccessor,
+};
 
 use crate::booklet::{self, BindingRule};
 slint::include_modules!();
@@ -37,16 +42,13 @@ macro_rules! def_cb {
 pub fn start_gui() -> Result<(), Box<dyn std::error::Error>> {
     let app = App::new()?;
     bind_all_callback(&app);
+    setup_app_icon(&app);
     app.run()?;
     Ok(())
 }
 
 pub fn bind_all_callback(app: &App) {
-    // let app_ref = app.as_weak();
-    // def_cb!(app, on_add_task, choose_pdf);
-    // def_cb!(app, on_clear_queue, cb_clear_queue);
     let _init = APP_REF.set(app.as_weak().clone());
-    def_cb!(app, on_load_app_icon, on_load_app_icon);
     def_cb!(app, on_add_pdf, on_add_pdf);
     def_cb!(app, on_change_pdf, on_change_pdf, idx);
     def_cb!(app, on_change_out_dir, on_change_out_dir, idx);
@@ -291,31 +293,46 @@ fn create_booklet(ui_ref: &Weak<App>, idx: isize, conf: &CreateConfig) {
     }
 }
 
-fn on_load_app_icon(_ui_handle: slint::Weak<App>) -> slint::Image {
-    // let ui = match ui_handle.upgrade() {
-    //     Some(ui) => ui,
-    //     None => return, // UI 可能已经被销毁，直接返回
-    // };
-    println!("load app icon");
-    if let Some(img) = get_app_icon() {
-        img
-    } else {
-        Image::default()
+fn setup_app_icon(ui: &App) {
+    fn set_winit_icon(ui: &App) -> bool {
+        ui.window()
+            .with_winit_window(|w| {
+                // 时钟造型 RGBA（顶行优先，尺寸 256），直接以内存方式构造 winit 图标，
+                w.set_window_icon(get_app_icon());
+            })
+            .is_some()
     }
+    if set_winit_icon(ui) {
+        return;
+    }
+    let wt = ui.as_weak();
+    let attempts = Rc::new(Cell::new(0u32));
+    fn reschedule(wt: Weak<App>, attempts: Rc<Cell<u32>>) {
+        let n = attempts.get();
+        if n >= 20 {
+            return;
+        }
+        attempts.set(n + 1);
+        let wt2 = wt.clone();
+        let attempts2 = attempts.clone();
+        Timer::single_shot(Duration::from_millis(200), move || {
+            if let Some(ui) = wt2.upgrade() {
+                if !set_winit_icon(&ui) {
+                    reschedule(wt2.clone(), attempts2.clone());
+                }
+            }
+        });
+    }
+    reschedule(wt, attempts);
 }
 
-fn get_app_icon() -> Option<slint::Image> {
+fn get_app_icon() -> Option<slint::winit_030::winit::window::Icon> {
     let icon_data = include_bytes!("../ui/res/app.ico");
-    // IcoDecoder::new(BufReader::from(icon_data)).unwrap();
     if let Ok(img) = image::load_from_memory_with_format(icon_data, image::ImageFormat::Ico) {
         let rgba = img.to_rgba8();
-        // img.save("debug_icon_check.png").unwrap();
         let (width, height) = rgba.dimensions();
-        // println!("图标尺寸: {}x{}", width, height);
-        let buf = SharedPixelBuffer::clone_from_slice(&rgba, width, height);
-        let slint_image = Image::from_rgba8(buf);
-        println!("get_app_icon");
-        Some(slint_image)
+        let img_data = rgba.to_vec();
+        slint::winit_030::winit::window::Icon::from_rgba(img_data, width, height).ok()
     } else {
         None
     }

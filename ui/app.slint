@@ -258,15 +258,11 @@ component TaskView {
 
 export component App inherits Window {
     title: "BKB——PDF小册子生成工具";
-    // icon: @image-url("res/app.ico");
-    icon: load-app-icon();
     width: 800px;
     preferred-height: 600px;
     min-height: 600px;
     default-font-size: 14px;
     default-font-family: "Microsoft YaHei";
-    // icon: app-icon;
-    // in property <image> app-icon;
     in-out property <CreateConfig> template_conf: {
         has_cover: false,
         sheet-per-booklet: 10,
@@ -276,13 +272,17 @@ export component App inherits Window {
     in-out property <[CreateConfig]> task-list: [];
     // in-out property <int> update_task_idx: -1;
     in-out property <bool> pending: false;
-    // in property <image> icon;
+    in-out property <image> dyn-icon;
     callback add-pdf();
     callback start-task(int);
     callback change-pdf(int) -> string;
     callback open-out-dir(int);
     callback change-out-dir(int);
     pure callback load-app-icon() -> image;
+
+    public function init-icon(img: image) {
+    root.icon = img;
+    }
 
     VerticalLayout {
         padding: 6px;

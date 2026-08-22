@@ -1,27 +1,38 @@
 [package]
 name = "bkb"
-version = "1.0.5"
+version = "1.0.6"
 edition = "2024"
 description = "Booklet Builder"
 
 [dependencies]
-# oxidize-pdf = "2.5.1"
-# pdfium-render = "0.9.0"
-# # pdfium-auto = {version="0.3.0", features=[]}
 image = "0.25"
 native-dialog = {version = "0.9.6", features = ["windows_dpi_awareness", "windows_visual_styles"]}
+# rfd = "0.17"
 # timed-map= "1.7"
-# webbrowser = "1.2.0"
-# argh = "0.1.19"
-# lexopt = "0.3.2"
 
 
 [dependencies.lopdf]
-version = "0.43.0"
+version = "0.44"
 
 [dependencies.slint]
 version = "1.17"
-features = ["backend-winit", "renderer-femtovg-wgpu"]
+features = ["backend-winit", "renderer-femtovg-wgpu", "unstable-winit-030"]
+
+# [target.'cfg(windows)'.dependencies]
+# windows = { version = "0.62", features = [
+#     "Win32_UI_WindowsAndMessaging",
+#     "Win32_System_LibraryLoader",
+#     "Win32_Foundation"
+# ]}
+
+[target.'cfg(windows)'.build-dependencies]
+winresource = "0.1"
+
+[package.metadata.winresource]
+# OriginalFilename = "bkb.exe"
+LegalCopyright = "Copyright © 2026 Kaay"
+FileDescription = "小册子生成工具"
+ProductName = "小册子生成工具"
 
 [build-dependencies]
 slint-build = "1.17"
@@ -29,7 +40,12 @@ lucide-slint = "1.8.0"
 # twill = { version = "0.2", features = ["slint"] }
 
 
+[profile.dev.package."*"]
+opt-level = "z"
+codegen-units = 1
+
 [profile.release]
+opt-level = "z"
 codegen-units = 1
 lto = true
 strip = true

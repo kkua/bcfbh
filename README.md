@@ -42,4 +42,4 @@
 
 ## 许可证
 
-MIT License
+GPLv3
